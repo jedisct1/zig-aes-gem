@@ -79,13 +79,13 @@ fn AesGem(comptime Aes: type) type {
             key_schedule.encrypt(&s, &s);
 
             var computed_tag: [tag_length]u8 = undefined;
-            crypto.core.modes.ctr(@TypeOf(subkey_schedule), subkey_schedule, &computed_tag, &j0, iv, .big);
+            crypto.core.modes.ctr(aes.AesEncryptCtx(Aes), subkey_schedule, &computed_tag, &j0, iv, .big);
             xor(&computed_tag, &s);
 
             if (!crypto.utils.timingSafeEql([tag_length]u8, computed_tag, expected_tag)) {
                 return error.AuthenticationFailed;
             }
-            crypto.core.modes.ctr(@TypeOf(subkey_schedule), subkey_schedule, plaintext, ciphertext, iv, .big);
+            crypto.core.modes.ctr(aes.AesEncryptCtx(Aes), subkey_schedule, plaintext, ciphertext, iv, .big);
         }
 
         // Key commitment
@@ -97,7 +97,7 @@ fn AesGem(comptime Aes: type) type {
             var out: [commitment_length]u8 = undefined;
             const nonce_leftover = nonce[nonce.len - 8 ..].*;
             const iv = nonce_leftover ++ [_]u8{0xff} ** 7 ++ [_]u8{0xfc};
-            crypto.core.modes.ctr(@TypeOf(subkey_schedule), subkey_schedule, &out, &out, iv, .big);
+            crypto.core.modes.ctr(aes.AesEncryptCtx(Aes), subkey_schedule, &out, &out, iv, .big);
             return out;
         }
 
