@@ -123,22 +123,20 @@ fn AesGem(comptime Aes: type) type {
 // Tests
 
 test {
-    const Aeads = [_]type{ Aes128Gem, Aes256Gem };
-    inline for (Aeads) |Aead| {
+    const ad = "Associated data";
+    const plaintext = "Plaintext";
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+
+    inline for ([_]type{ Aes128Gem, Aes256Gem }) |Aead| {
         var key: [Aead.key_length]u8 = undefined;
         var nonce: [Aead.nonce_length]u8 = undefined;
         crypto.random.bytes(&nonce);
         crypto.random.bytes(&key);
-        const ad = "Associated data";
-        const plaintext = "Plaintext";
-        var ciphertext: [plaintext.len]u8 = undefined;
-        var plaintext2: [plaintext.len]u8 = undefined;
         var tag: [Aead.tag_length]u8 = undefined;
-
         Aead.encrypt(&ciphertext, &tag, plaintext, ad, nonce, key);
-        try Aead.decrypt(&plaintext2, &ciphertext, tag, ad, nonce, key);
-        try std.testing.expectEqualSlices(u8, plaintext, &plaintext2);
-
+        try Aead.decrypt(&decrypted, &ciphertext, tag, ad, nonce, key);
+        try std.testing.expectEqualSlices(u8, plaintext, &decrypted);
         _ = Aead.commitment(key, nonce);
     }
 }
