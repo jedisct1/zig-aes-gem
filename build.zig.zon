@@ -1,6 +1,7 @@
 .{
-    .name = "aes-gem",
+    .name = .aes_gem,
     .version = "0.0.1",
+    .fingerprint = 0xa399dc8f86c5da08,
     .paths = .{
         "build.zig",
         "build.zig.zon",
