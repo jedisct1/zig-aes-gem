@@ -82,7 +82,7 @@ fn AesGem(comptime Aes: type) type {
             crypto.core.modes.ctr(aes.AesEncryptCtx(Aes), subkey_schedule, &computed_tag, &j0, iv, .big);
             xor(&computed_tag, &s);
 
-            if (!crypto.utils.timingSafeEql([tag_length]u8, computed_tag, expected_tag)) {
+            if (!crypto.timing_safe.eql([tag_length]u8, computed_tag, expected_tag)) {
                 return error.AuthenticationFailed;
             }
             crypto.core.modes.ctr(aes.AesEncryptCtx(Aes), subkey_schedule, plaintext, ciphertext, iv, .big);
