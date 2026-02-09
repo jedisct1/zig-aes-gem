@@ -131,8 +131,8 @@ test {
     inline for ([_]type{ Aes128Gem, Aes256Gem }) |Aead| {
         var key: [Aead.key_length]u8 = undefined;
         var nonce: [Aead.nonce_length]u8 = undefined;
-        crypto.random.bytes(&nonce);
-        crypto.random.bytes(&key);
+        std.testing.io.random(&nonce);
+        std.testing.io.random(&key);
         var tag: [Aead.tag_length]u8 = undefined;
         Aead.encrypt(&ciphertext, &tag, plaintext, ad, nonce, key);
         try Aead.decrypt(&decrypted, &ciphertext, tag, ad, nonce, key);
