@@ -63,7 +63,7 @@ fn AesGem(comptime Aes: type, comptime tag_len: comptime_int) type {
             @memcpy(iv[0..8], &nonce_tail);
             mem.writeInt(u64, iv[8..16], 0xFFFFFFFF_FFFFFFFC, .big);
 
-            var out = [_]u8{0} ** commitment_length;
+            var out: [commitment_length]u8 = @splat(0);
             crypto.core.modes.ctrSlice(EncCtx, subkey_schedule, &out, &out, iv, .big, 12, 4);
             return out;
         }
@@ -114,7 +114,7 @@ fn AesGem(comptime Aes: type, comptime tag_len: comptime_int) type {
             var state: [16]u8 = nonce[0..16].*;
             key_schedule.encrypt(&state, &state);
 
-            var block: [16]u8 = [_]u8{0} ** 16;
+            var block: [16]u8 = @splat(0);
             @memcpy(block[0..7], "GEM-128");
             block[7] = 0x80;
             xor(&block, &state);
@@ -204,7 +204,7 @@ fn AesGem(comptime Aes: type, comptime tag_len: comptime_int) type {
         ///   T = (j0_mask XOR S2)[0..tag_length]
         fn computeTag(key_schedule: EncCtx, subkey_schedule: EncCtx, nonce_tail: [8]u8, ad: []const u8, ct: []const u8) [tag_length]u8 {
             // Derive GHASH key with tag-length domain separation
-            var h: [16]u8 = [_]u8{0xFF} ** 16;
+            var h: [16]u8 = @splat(0xFF);
             h[8] = 0xFE;
             h[15] = tag_len * 8;
             subkey_schedule.encrypt(&h, &h);
@@ -227,7 +227,10 @@ fn AesGem(comptime Aes: type, comptime tag_len: comptime_int) type {
             key_schedule.encrypt(&s, &s);
 
             // j0_mask = AES-ECB(subkey, j0)
-            var j0: [16]u8 = nonce_tail ++ [_]u8{0xFF} ** 7 ++ [_]u8{0xFE};
+            var j0: [16]u8 = undefined;
+            @memcpy(j0[0..8], &nonce_tail);
+            @memset(j0[8..15], 0xFF);
+            j0[15] = 0xFE;
             subkey_schedule.encrypt(&j0, &j0);
 
             // T = j0_mask XOR S2
@@ -276,25 +279,25 @@ test "KAT group 1: AES-256-GEM, 128-bit tag" {
 
     const vectors = [_]T{
         // Test 1: Empty plaintext and AAD, all-zero key/nonce
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = "", .aad = "", .ciphertext = "", .tag = hexToBytes("51710d926727d97eafdef7a1e8e84481") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = "", .aad = "", .ciphertext = "", .tag = hexToBytes("51710d926727d97eafdef7a1e8e84481") },
         // Test 2: Empty plaintext, with AAD
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = "", .aad = &hexToBytes("6164646974696f6e616c2064617461"), .ciphertext = "", .tag = hexToBytes("7b8a46e020f4da8e000d650a1a22d02e") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = "", .aad = &hexToBytes("6164646974696f6e616c2064617461"), .ciphertext = "", .tag = hexToBytes("7b8a46e020f4da8e000d650a1a22d02e") },
         // Test 3: With plaintext, empty AAD
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("68656c6c6f2c204145532d3235362d47454d21"), .aad = "", .ciphertext = &hexToBytes("f5b7a03c51ba202ab9c8dc0296dd697b025dfc"), .tag = hexToBytes("3502a8d2342651fa1a810d9e053fede6") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("68656c6c6f2c204145532d3235362d47454d21"), .aad = "", .ciphertext = &hexToBytes("f5b7a03c51ba202ab9c8dc0296dd697b025dfc"), .tag = hexToBytes("3502a8d2342651fa1a810d9e053fede6") },
         // Test 4: With plaintext and AAD
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("68656c6c6f2c204145532d3235362d47454d21"), .aad = &hexToBytes("6164646974696f6e616c2064617461"), .ciphertext = &hexToBytes("f5b7a03c51ba202ab9c8dc0296dd697b025dfc"), .tag = hexToBytes("6362a11eff57a8b54fa62581c23e2074") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("68656c6c6f2c204145532d3235362d47454d21"), .aad = &hexToBytes("6164646974696f6e616c2064617461"), .ciphertext = &hexToBytes("f5b7a03c51ba202ab9c8dc0296dd697b025dfc"), .tag = hexToBytes("6362a11eff57a8b54fa62581c23e2074") },
         // Test 5: Single byte plaintext
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("42"), .aad = "", .ciphertext = &hexToBytes("df"), .tag = hexToBytes("bcf4408eadc5b027a05edf0b919fc6c1") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("42"), .aad = "", .ciphertext = &hexToBytes("df"), .tag = hexToBytes("bcf4408eadc5b027a05edf0b919fc6c1") },
         // Test 6: One block (16 bytes) plaintext
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a33"), .tag = hexToBytes("8b7daf7d2f8f0e697f3c93baeb2007d9") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a33"), .tag = hexToBytes("8b7daf7d2f8f0e697f3c93baeb2007d9") },
         // Test 7: One block + 1 byte (17 bytes) plaintext
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f10"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a3357"), .tag = hexToBytes("e3850993f3b03edad7641660173640aa") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f10"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a3357"), .tag = hexToBytes("e3850993f3b03edad7641660173640aa") },
         // Test 8: Three blocks (48 bytes) plaintext
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a335701cf3060364949799511730bf3721d774a5414662b80d9ae55554bfb4c7d61"), .tag = hexToBytes("e99106ddf89df9bd1af7939ec927b7dc") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f"), .aad = "", .ciphertext = &hexToBytes("9dd3ce533a93066cf492fb3bafe64a335701cf3060364949799511730bf3721d774a5414662b80d9ae55554bfb4c7d61"), .tag = hexToBytes("e99106ddf89df9bd1af7939ec927b7dc") },
         // Test 9: Incrementing key and nonce
         .{ .key = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .nonce = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .plaintext = &hexToBytes("54686520717569636b2062726f776e20666f78206a756d7073206f76657220746865206c617a7920646f67"), .aad = &hexToBytes("41454144206173736f6369617465642064617461"), .ciphertext = &hexToBytes("737cf44ad0b728e88e4b9d81bd476d2d6496a87e9661bd0c5576a91bd0dc4d9a46f6a421942c9a4b421a53"), .tag = hexToBytes("681b0552d339fd459bd94a3dc4284b79") },
         // Test 10: All-ones key and nonce
-        .{ .key = [_]u8{0xFF} ** 32, .nonce = [_]u8{0xFF} ** 32, .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), .aad = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .ciphertext = &hexToBytes("81be5260fad0773fc6ec46e9cfe67152cb9df6df3c5da4c6f7890d57afece318890ae3de5a0316d4dd7cf1f6fc1bcf666fede6ab044e97a561d1768875da2041"), .tag = hexToBytes("569673d0f112c0b955699646da0261f1") },
+        .{ .key = @splat(0xFF), .nonce = @splat(0xFF), .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), .aad = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .ciphertext = &hexToBytes("81be5260fad0773fc6ec46e9cfe67152cb9df6df3c5da4c6f7890d57afece318890ae3de5a0316d4dd7cf1f6fc1bcf666fede6ab044e97a561d1768875da2041"), .tag = hexToBytes("569673d0f112c0b955699646da0261f1") },
         // Test 11: 256-byte plaintext, 64-byte AAD
         .{ .key = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .nonce = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .plaintext = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"), .aad = &hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), .ciphertext = &hexToBytes("27159369a5c7478ced62f5f8de3d0d0212e8c24de801c66b3e4fdc76a9b373f10eb2a66ed173c54c0e5c1e5fa314a7b49533b8b18aaeb04344099094ce5b4c24db3871999b7a53fab7842062531ef632b2bf1b9cbd59c3c520f5a35f81ea3d257d26081f40328b8b25c06eeaf3a9aab7e7a3d528d93eb6df66f2f88313e38a5bf315259f2f760efb89d6e6f28f09eb44866aab2ed44c71720c9b4f39d4e4667d209e0b981fd76cb3e132b69b50a42a87b5eaff200b61e0b7e34f5a71ff24a66818f4d58cbe76ad18950c357ef30b5223004a4062b53037cc51d1b7a9dc026bafd7441b82b24e94b3d8eaf32da55081bada2e99645841a8febf658b512cb25318"), .tag = hexToBytes("d6d6870574474450567a0181b945c74d") },
         // Test 12: Short plaintext, 256-byte AAD
@@ -329,7 +332,7 @@ test "KAT group 2: AES-256-GEM, 96-bit tag" {
     const T = struct { key: [32]u8, nonce: [32]u8, plaintext: []const u8, aad: []const u8, ciphertext: []const u8, tag: [12]u8 };
 
     const vectors = [_]T{
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .plaintext = "", .aad = "", .ciphertext = "", .tag = hexToBytes("51710d926727d97eafdef7a1") },
+        .{ .key = @splat(0), .nonce = @splat(0), .plaintext = "", .aad = "", .ciphertext = "", .tag = hexToBytes("51710d926727d97eafdef7a1") },
         .{ .key = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .nonce = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .plaintext = &hexToBytes("68656c6c6f2c204145532d3235362d47454d21"), .aad = &hexToBytes("6164646974696f6e616c2064617461"), .ciphertext = &hexToBytes("4f71fd06ceee61caa038d2c1e7062e4a47b4f1"), .tag = hexToBytes("b176ea201cf7147f551532a4") },
     };
 
@@ -352,9 +355,9 @@ test "KAT group 6: key commitment" {
     const Gem = Aes256Gem;
 
     const vectors = [_]struct { key: [32]u8, nonce: [32]u8, commitment: [32]u8 }{
-        .{ .key = [_]u8{0} ** 32, .nonce = [_]u8{0} ** 32, .commitment = hexToBytes("6e605e81e59ffebe4e0fb6f49826dd769a29452b64be504635d700e0cb4787b1") },
+        .{ .key = @splat(0), .nonce = @splat(0), .commitment = hexToBytes("6e605e81e59ffebe4e0fb6f49826dd769a29452b64be504635d700e0cb4787b1") },
         .{ .key = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .nonce = hexToBytes("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), .commitment = hexToBytes("14f805292761a15ec59045c1ac818f8cc30ef16975895782260b0fe0b96304fb") },
-        .{ .key = [_]u8{0xFF} ** 32, .nonce = [_]u8{0xFF} ** 32, .commitment = hexToBytes("6cbbc2c59e777e8d275fc1410eed921abe726320a93c9bd9eac9fa34e0760a3a") },
+        .{ .key = @splat(0xFF), .nonce = @splat(0xFF), .commitment = hexToBytes("6cbbc2c59e777e8d275fc1410eed921abe726320a93c9bd9eac9fa34e0760a3a") },
     };
 
     for (vectors) |v| {
